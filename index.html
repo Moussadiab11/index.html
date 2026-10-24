@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Control Hub" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="theme-color" content="#000000" />
+  <meta name="theme-color" id="metaThemeColor" content="#000000" />
   <meta name="application-name" content="Control Hub" />
   
   <!-- Manifest & Icons -->
@@ -38,9 +38,9 @@
       theme: {
         extend: {
           colors: {
-            appBg: '#000000',
-            cardBg: '#121215',
-            cardBorder: '#222228',
+            appBg: 'var(--color-appBg, #000000)',
+            cardBg: 'var(--color-cardBg, #121215)',
+            cardBorder: 'var(--color-cardBorder, #222228)',
             accentRed: '#ff3b30',
             accentGreen: '#34c759',
             accentBlue: '#0a84ff',
@@ -61,7 +61,7 @@
       -webkit-tap-highlight-color: transparent; 
       -webkit-user-select: none;
       user-select: none;
-      background-color: #000000;
+      background-color: var(--color-appBg, #000000);
       touch-action: manipulation;
     }
 
@@ -224,6 +224,25 @@
         <button onclick="alert('Signed out securely.')" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold px-3 py-2 rounded-xl transition">Sign Out</button>
       </div>
 
+      <!-- Theme Settings Card -->
+      <div class="bg-cardBg p-4 rounded-2xl border border-cardBorder space-y-3">
+        <h3 class="text-xs font-bold text-zinc-300 uppercase tracking-wider">App Theme Selection</h3>
+        <div class="grid grid-cols-2 gap-2.5">
+          <button onclick="setTheme('midnight')" id="themeBtn-midnight" class="p-3 rounded-xl border text-xs font-bold text-left transition bg-[#000000] border-zinc-800 text-white">
+            🌌 Midnight Black
+          </button>
+          <button onclick="setTheme('violet')" id="themeBtn-violet" class="p-3 rounded-xl border text-xs font-bold text-left transition bg-[#0b0714] border-purple-900/50 text-purple-300">
+            🔮 OLED Violet
+          </button>
+          <button onclick="setTheme('emerald')" id="themeBtn-emerald" class="p-3 rounded-xl border text-xs font-bold text-left transition bg-[#05110d] border-emerald-900/50 text-emerald-300">
+            🌿 Emerald Cyber
+          </button>
+          <button onclick="setTheme('sunset')" id="themeBtn-sunset" class="p-3 rounded-xl border text-xs font-bold text-left transition bg-[#160b09] border-orange-900/50 text-orange-300">
+            🌅 Sunset Dark
+          </button>
+        </div>
+      </div>
+
       <!-- Level & XP Status Box -->
       <div class="bg-cardBg p-4 rounded-2xl border border-cardBorder space-y-2">
         <div class="flex justify-between items-center text-xs">
@@ -282,11 +301,7 @@
         <div>
           <label class="block text-[10px] font-bold text-zinc-400 uppercase mb-1">Subject / Category</label>
           <select id="modalSubject" class="w-full bg-[#161619] border border-cardBorder rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500">
-            <option value="Programming">Programming</option>
-            <option value="Mathematics">Mathematics</option>
-            <option value="Physics">Physics</option>
-            <option value="English">English</option>
-            <option value="General">General</option>
+            <!-- Dynamically populated from state.subjects -->
           </select>
         </div>
 
@@ -350,14 +365,23 @@
   </nav>
 
   <script>
-    // Unified App State (Levels 1 to 10000, XP system, Timetable, Tasks, Attendance)
-    let state = JSON.parse(localStorage.getItem('controlHubData_v5')) || {
+    // Theme Presets Definition
+    const themes = {
+      midnight: { appBg: '#000000', cardBg: '#121215', cardBorder: '#222228', meta: '#000000' },
+      violet: { appBg: '#07040e', cardBg: '#110b1f', cardBorder: '#281c45', meta: '#07040e' },
+      emerald: { appBg: '#030d0a', cardBg: '#0a1c17', cardBorder: '#16382e', meta: '#030d0a' },
+      sunset: { appBg: '#0f0706', cardBg: '#1c100e', cardBorder: '#38221e', meta: '#0f0706' }
+    };
+
+    // Unified App State
+    let state = JSON.parse(localStorage.getItem('controlHubData_v6')) || {
+      theme: 'midnight',
       xp: 0,
       streak: 0,
       lastAttendanceDate: null,
       selectedDateOffset: 0,
       currentWeekOffset: 0,
-      timetable: {}, // dateKey -> array of items
+      timetable: {},
       tasks: [],
       attendanceHistory: {},
       subjects: [
@@ -371,12 +395,44 @@
     let activeModalType = 'Lesson';
 
     function saveState() {
-      localStorage.setItem('controlHubData_v5', JSON.stringify(state));
+      localStorage.setItem('controlHubData_v6', JSON.stringify(state));
       render();
     }
 
-    // LEVEL & XP ENGINE (Level 1 to 10,000)
-    // Formula: Each level requires 100 XP * level multiplier
+    // Apply Active Theme
+    function setTheme(themeName) {
+      state.theme = themeName || 'midnight';
+      const t = themes[state.theme] || themes.midnight;
+      
+      document.documentElement.style.setProperty('--color-appBg', t.appBg);
+      document.documentElement.style.setProperty('--color-cardBg', t.cardBg);
+      document.documentElement.style.setProperty('--color-cardBorder', t.cardBorder);
+      document.getElementById('metaThemeColor').setAttribute('content', t.meta);
+
+      // Highlight active theme button in settings
+      Object.keys(themes).forEach(k => {
+        const btn = document.getElementById(`themeBtn-${k}`);
+        if (btn) {
+          if (k === state.theme) {
+            btn.classList.add('ring-2', 'ring-white');
+          } else {
+            btn.classList.remove('ring-2', 'ring-white');
+          }
+        }
+      });
+
+      saveState();
+    }
+
+    // Safe Date Key Generator (Avoiding UTC timezone offset bugs)
+    function getDateKey(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // LEVEL & XP ENGINE
     function addXP(amount) {
       state.xp += amount;
       saveState();
@@ -384,10 +440,8 @@
 
     function calculateLevelData() {
       let currentLevel = 1;
-      let xpNeededForNext = 100;
       let totalXpAccumulated = 0;
 
-      // Calculate level up to 10,000
       while (currentLevel < 10000) {
         let cost = currentLevel * 100;
         if (state.xp >= totalXpAccumulated + cost) {
@@ -443,7 +497,6 @@
       document.getElementById('selectedDayTitle').innerText = selected.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 
       dateStrip.innerHTML = '';
-      // Show 7 days of the selected week offset
       for (let i = -3; i <= 3; i++) {
         const d = new Date();
         d.setDate(now.getDate() + (state.currentWeekOffset * 7) + i);
@@ -454,7 +507,7 @@
         const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
         const dayNum = d.getDate();
         const monthName = d.toLocaleDateString('en-US', { month: 'short' });
-        const dayOffset = Math.round((d - now) / 86400000);
+        const dayOffset = Math.round((d - new Date()) / 86400000);
 
         const dateCard = document.createElement('div');
         dateCard.className = `flex-shrink-0 w-16 py-2.5 rounded-2xl text-center border cursor-pointer transition ${
@@ -494,6 +547,11 @@
     function openAddModal(type) {
       activeModalType = type;
       setModalType(type);
+      
+      // Populate Subject Dropdown from state
+      const subjectSelect = document.getElementById('modalSubject');
+      subjectSelect.innerHTML = state.subjects.map(s => `<option value="${s.name}">${s.name} (${s.code})</option>`).join('');
+
       document.getElementById('addModal').classList.remove('hidden');
     }
 
@@ -520,7 +578,7 @@
       const subject = document.getElementById('modalSubject').value;
       if (!title) return alert('Please enter a title.');
 
-      const dateKey = getSelectedDate().toISOString().split('T')[0];
+      const dateKey = getDateKey(getSelectedDate());
       if (!state.timetable[dateKey]) state.timetable[dateKey] = [];
 
       state.timetable[dateKey].push({
@@ -531,25 +589,25 @@
         done: false
       });
 
-      addXP(20); // +20 XP for adding/completing timetable items
+      addXP(20);
       closeAddModal();
       saveState();
     }
 
     function toggleTimetableItem(id) {
-      const dateKey = getSelectedDate().toISOString().split('T')[0];
+      const dateKey = getDateKey(getSelectedDate());
       if (!state.timetable[dateKey]) return;
       
       const item = state.timetable[dateKey].find(i => i.id === id);
       if (item) {
         item.done = !item.done;
-        if (item.done) addXP(25); // +25 XP when completing lesson/homework/exam
+        if (item.done) addXP(25);
         saveState();
       }
     }
 
     function deleteTimetableItem(id) {
-      const dateKey = getSelectedDate().toISOString().split('T')[0];
+      const dateKey = getDateKey(getSelectedDate());
       if (!state.timetable[dateKey]) return;
       state.timetable[dateKey] = state.timetable[dateKey].filter(i => i.id !== id);
       saveState();
@@ -569,7 +627,7 @@
       });
 
       input.value = '';
-      addXP(15); // +15 XP for adding tasks
+      addXP(15);
       saveState();
     }
 
@@ -577,7 +635,7 @@
       const task = state.tasks.find(t => t.id === id);
       if (task) {
         task.done = !task.done;
-        if (task.done) addXP(15); // +15 XP for completing task
+        if (task.done) addXP(15);
         saveState();
       }
     }
@@ -589,22 +647,25 @@
 
     // Attendance Function
     function markSchoolAttendance() {
-      const todayKey = new Date().toISOString().split('T')[0];
+      const todayKey = getDateKey(new Date());
       if (state.attendanceHistory[todayKey]) {
         return alert('Attendance already marked for today!');
       }
 
       state.attendanceHistory[todayKey] = true;
       
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-      if (state.lastAttendanceDate === yesterday || !state.lastAttendanceDate) {
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      const yesterdayKey = getDateKey(yesterdayDate);
+
+      if (state.lastAttendanceDate === yesterdayKey || !state.lastAttendanceDate) {
         state.streak += 1;
       } else {
         state.streak = 1;
       }
       state.lastAttendanceDate = todayKey;
 
-      addXP(50); // +50 XP for school attendance!
+      addXP(50);
       saveState();
       alert('School attendance recorded! +50 XP earned.');
     }
@@ -627,7 +688,7 @@
       const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `control-hub-pro-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `control-hub-pro-backup-${getDateKey(new Date())}.json`;
       a.click();
     }
 
@@ -636,6 +697,7 @@
       reader.onload = (event) => {
         try {
           state = JSON.parse(event.target.result);
+          setTheme(state.theme || 'midnight');
           saveState();
           alert('Backup restored successfully!');
         } catch {
@@ -648,7 +710,8 @@
     function addSubjectPrompt() {
       const name = prompt('Enter subject name (e.g. Chemistry):');
       if (!name) return;
-      state.subjects.push({ name, code: 'SUBJ', color: 'cyan' });
+      const code = prompt('Enter subject code (e.g. CHEM101):') || 'SUBJ';
+      state.subjects.push({ name, code, color: 'cyan' });
       saveState();
     }
 
@@ -668,11 +731,11 @@
       document.getElementById('settingsXpNext').innerText = `${lvlData.nextXpCost - lvlData.currentXp} XP to Level ${lvlData.level + 1}`;
 
       // Render Timetable Items for Selected Day
-      const dateKey = getSelectedDate().toISOString().split('T')[0];
+      const dateKey = getDateKey(getSelectedDate());
       const dayItems = state.timetable[dateKey] || [];
       
       document.getElementById('timetableItemList').innerHTML = dayItems.length ? dayItems.map(item => `
-        <div class="bg-[#161619] p-3.5 rounded-2xl border border-cardBorder flex justify-between items-center transition ${item.done ? 'opacity-50' : ''}">
+        <div class="bg-black/30 p-3.5 rounded-2xl border border-cardBorder flex justify-between items-center transition ${item.done ? 'opacity-50' : ''}">
           <div class="flex items-center space-x-3 flex-1 cursor-pointer" onclick="toggleTimetableItem(${item.id})">
             <div class="w-6 h-6 rounded-full border border-zinc-700 flex items-center justify-center text-xs font-bold ${item.done ? 'bg-emerald-500 border-emerald-500 text-black' : ''}">
               ${item.done ? '✓' : ''}
@@ -726,7 +789,8 @@
       `).join('') : `<p class="text-xs text-zinc-600 italic">No attendance records yet.</p>`;
     }
 
-    // Initial Render
+    // Initialize Theme & Render on Load
+    setTheme(state.theme || 'midnight');
     render();
   </script>
 </body>
