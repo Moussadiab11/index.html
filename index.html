@@ -73,7 +73,7 @@
 <body class="bg-appBg text-white min-h-screen font-sans antialiased select-none">
 
   <!-- Header -->
-  <header class="px-5 pb-3 bg-black/90 border-b border-cardBorder/60 flex justify-between items-center sticky top-0 z-20 backdrop-blur-2xl">
+  <header class="px-5 pb-3 bg-black/9of bg-appBg/90 border-b border-transparent flex justify-between items-center sticky top-0 z-20 backdrop-blur-2xl">
     <div>
       <h1 id="headerTitle" class="text-2xl font-black tracking-tight text-white flex items-center gap-2">Timetable</h1>
       <p id="currentDateSub" class="text-xs font-medium text-zinc-400 mt-0.5">Loading date...</p>
@@ -339,7 +339,7 @@
   </div>
 
   <!-- Bottom Navigation Bar -->
-  <nav class="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-2xl border-t border-cardBorder/80 px-2 pt-2 z-30">
+  <nav class="fixed bottom-0 left-0 right-0 bg-appBg/90 backdrop-blur-2xl border-t border-transparent px-2 pt-2 z-30">
     <div class="max-w-md mx-auto flex justify-around items-center text-center">
       <button onclick="switchTab('timetable')" id="nav-timetable" class="nav-btn flex-1 py-1 text-white flex flex-col items-center">
         <span class="text-lg">📅</span>
@@ -399,6 +399,11 @@
       render();
     }
 
+    // Auto-save listener on input changes
+    document.addEventListener('input', () => {
+      localStorage.setItem('controlHubData_v6', JSON.stringify(state));
+    });
+
     // Apply Active Theme
     function setTheme(themeName) {
       state.theme = themeName || 'midnight';
@@ -409,7 +414,6 @@
       document.documentElement.style.setProperty('--color-cardBorder', t.cardBorder);
       document.getElementById('metaThemeColor').setAttribute('content', t.meta);
 
-      // Highlight active theme button in settings
       Object.keys(themes).forEach(k => {
         const btn = document.getElementById(`themeBtn-${k}`);
         if (btn) {
@@ -424,7 +428,7 @@
       saveState();
     }
 
-    // Safe Date Key Generator (Avoiding UTC timezone offset bugs)
+    // Safe Date Key Generator
     function getDateKey(d) {
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -548,7 +552,6 @@
       activeModalType = type;
       setModalType(type);
       
-      // Populate Subject Dropdown from state
       const subjectSelect = document.getElementById('modalSubject');
       subjectSelect.innerHTML = state.subjects.map(s => `<option value="${s.name}">${s.name} (${s.code})</option>`).join('');
 
@@ -719,7 +722,6 @@
     function render() {
       initDateStrip();
 
-      // Update XP & Level Headers
       const lvlData = calculateLevelData();
       document.getElementById('headerLevel').innerText = lvlData.level;
       document.getElementById('headerLevelPercent').innerText = lvlData.percent;
@@ -730,7 +732,6 @@
       document.getElementById('settingsXpCurrent').innerText = `${lvlData.currentXp} XP`;
       document.getElementById('settingsXpNext').innerText = `${lvlData.nextXpCost - lvlData.currentXp} XP to Level ${lvlData.level + 1}`;
 
-      // Render Timetable Items for Selected Day
       const dateKey = getDateKey(getSelectedDate());
       const dayItems = state.timetable[dateKey] || [];
       
@@ -752,7 +753,6 @@
         </div>
       `).join('') : `<p class="text-xs text-zinc-600 italic py-2">No classes or tasks scheduled for this day.</p>`;
 
-      // Render Subjects Grid
       document.getElementById('subjectsGrid').innerHTML = state.subjects.map(sub => `
         <div class="bg-cardBg p-4 rounded-2xl border border-cardBorder space-y-2">
           <div class="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold text-xs">📖</div>
@@ -763,7 +763,6 @@
         </div>
       `).join('');
 
-      // Render Tasks
       document.getElementById('fullTaskList').innerHTML = state.tasks.length ? state.tasks.map(task => `
         <div class="bg-cardBg p-3.5 rounded-2xl border border-cardBorder flex justify-between items-center transition ${task.done ? 'opacity-50' : ''}">
           <div class="flex items-center space-x-3 flex-1 cursor-pointer" onclick="toggleTask(${task.id})">
@@ -779,7 +778,6 @@
         </div>
       `).join('') : `<p class="text-xs text-zinc-600 italic">No tasks added yet.</p>`;
 
-      // Render Attendance History
       const attKeys = Object.keys(state.attendanceHistory).sort().reverse();
       document.getElementById('attendanceHistoryList').innerHTML = attKeys.length ? attKeys.map(k => `
         <div class="bg-cardBg p-3 rounded-xl border border-cardBorder text-xs flex justify-between items-center">
@@ -789,7 +787,6 @@
       `).join('') : `<p class="text-xs text-zinc-600 italic">No attendance records yet.</p>`;
     }
 
-    // Initialize Theme & Render on Load
     setTheme(state.theme || 'midnight');
     render();
   </script>
